@@ -17,6 +17,8 @@ export default class WalkthroughManager {
 		this.eventManager = new EventManager();
 
 		this.recoverLS();
+
+		console.log(this.walkthroughs);
 	}
 
 	recoverLS () {

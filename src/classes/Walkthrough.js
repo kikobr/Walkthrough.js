@@ -1,6 +1,9 @@
 /*
 *	TODO: Instead of using this.getStep() everytime and do recalculations everytime,
 *	try to store currentStep as a class property, for fast retrieval. 
+*
+*	TODO: Inside onStepElementEnter, if the element was removed by
+*	frontend, try to wait until element is available to trigger it on.
 **/
 
 export default class Walkthrough {
@@ -29,6 +32,7 @@ export default class Walkthrough {
 		this.walkthroughManager = walkthroughManager;
 		this.title = walkthrough.title;
 		this.pages = walkthrough.pages;
+		this.options = walkthrough.options;
 
 		/*
 		* 	If there are pages before the current one in the walkthrough object, it means the user 
@@ -50,9 +54,13 @@ export default class Walkthrough {
 		// add to localStorage
 		this.saveLS();
 
-		let currentStep = this.getStep();
-		console.log('The current step is', currentStep);
-		if(currentStep) this.onStepElementEnter();
+		let currentStep = this.getStep(),
+			currentStepElement = document.querySelector(currentStep.target);
+		if(currentStep) {
+			console.log('The current step is', currentStep);
+			this.onStepElementEnter();
+			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
+		}
 		// console.log(this.getStep());
 	}
 
@@ -60,7 +68,8 @@ export default class Walkthrough {
 		if(!window.localStorage) return;
 		window.localStorage.setItem(this.walkthroughManager.localStorageKey, JSON.stringify({
 			title: this.title,
-			pages: this.pages
+			pages: this.pages,
+			options: this.options,
 		}));
 	}
 
@@ -128,16 +137,43 @@ export default class Walkthrough {
 		let currentPage = this.getPage(),
 			currentStep = this.getStep();
 		if(!currentPage || !currentStep) return false;
-		if(	evt.type == currentStep.type &&
-			evt.target == document.querySelector(currentStep.target)){
-			
+
+		let currentStepElement = document.querySelector(currentStep.target);
+
+		/*
+		*	Here, we are setting and getting data-attributes because it's the most reliable way
+		*	to identify if the evt.target fired really matches currentStep.target's selector.
+		*
+		*	Also, if the frontend is using a framework that re-renders dom tree and eliminates
+		*	evt.target element, we will still be able to identify the clicked element selector
+		*	and check if it matches our currentStep.target. It will allow us to move forward to
+		*	the next step, even if the element was removed in the frontend.
+		**/
+
+		if(	
+			evt.type == currentStep.type &&
+			(
+				evt.target.getAttribute('data-walkthrough-step-target') == currentStep.target ||
+				evt.target == currentStepElement ||
+				currentStepElement.contains(evt.target)
+			)
+			// && (
+			// )
+		){			
 			console.log('done:', currentStep);
 			this.onStepElementLeave();
+			currentStepElement.removeAttribute('data-walkthrough-step-target');
 			currentStep.done = true;
 			this.saveLS();
+
+			// new current step
+
+			currentStep = this.getStep();
+			currentStepElement = document.querySelector(currentStep.target);
+			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 			this.onStepElementEnter();
 
-			console.log('The current step is', this.getStep());
+			console.log('The current step is', currentStep);
 			// if it's last step of page
 			if(currentPage.steps.indexOf(currentStep) == currentPage.steps.length - 1 ){
 				// done
