@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title></title>
+		<link rel="stylesheet" href="http://kushagragour.in/lab/hint/hint.min.css">
+		<style>
+			.walkthrough-current,
+			[data-hint] {
+				outline: 1px solid red;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<div id="walkthrough-container"></div>
+
+		<form name="walkthrough-steps" class="walkthrough-steps">
+			<select name="event">
+				<option value="click">click</option>
+				<option value="keypress">keypress</option>
+			</select>
+			<button type="submit">record</button>
+			<button type="button" name="cancel-step">cancel step</button>
+		</form>
+
+
+		<hr>
+
+		<form action="">
+			<input type="text" name="name">
+			<button>Enviar</button>
+		</form>
+
+		<hr>
+
+		<button class="walkthrough-run">Run Walkthrough</button>
+
+		<script type="text/javascript" src="../dist/walkthrough.min.js"></script>
+		<script type="text/javascript" src="../dist/walkthrough-creator.min.js"></script>
+		<script>
+			var walkthroughManager = new WalkthroughManager({
+				walkthroughs: [
+					{
+						"title": "Default tutorial",
+						"pages": [
+							{
+								"url": "/demo/",
+								"steps": [
+									{
+										"type": "click",
+										"target": "input[name='name']",
+										"description": "Clique no campo"
+									},
+									{
+										"type": "keypress",
+										"target": "input[name='name']",
+										"description": "Digite algo"
+									},
+									{
+										"type": "click",
+										"target": "[name='record']",
+										"description": "Agora clica nesse esquema"
+									},
+									{
+										"type": "click",
+										"target": ".next-page",
+										"description": "Vai pra próxima página"
+									}
+								]
+							},
+							{
+								"url": "/demo/index-2.html",
+								"steps": [
+									{
+										"type": "click",
+										"target": ".walkthrough-steps",
+										"description": "Clica aqui pra terminar"
+									}
+								]
+							}
+						]
+					}
+				],
+				onStepElementEnter: function(el, step){
+					el.classList.add('hint--top');
+					el.classList.add('hint--always');
+					el.setAttribute('data-hint', step.description);
+				},
+				onStepElementLeave: function(el, step){
+					el.classList.remove('hint--top');
+					el.classList.remove('hint--always');
+					el.removeAttribute('data-hint');
+				},
+				onFinish: function(walkthroughName){
+					console.log('Terminou...', walkthroughName);
+				}
+			});
+		</script>
+	</body>
+</html>
