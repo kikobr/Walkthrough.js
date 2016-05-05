@@ -54,10 +54,10 @@ export default class Walkthrough {
 		// add to localStorage
 		this.saveLS();
 
-		let currentStep = this.getStep(),
-			currentStepElement = document.querySelector(currentStep.target);
+		let currentStep = this.getStep();
 		if(currentStep) {
 			console.log('The current step is', currentStep);
+			let currentStepElement = document.querySelector(currentStep.target);
 			this.onStepElementEnter();
 			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 		}
@@ -86,7 +86,8 @@ export default class Walkthrough {
 			nextPage = null,
 			page = null;
 		for (let [index, page] of this.pages.entries()) {
-			if(page.url == window.location.pathname){
+			// comparing the two urls is safer without final / 
+			if(page.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '')){
 				prevPage = this.pages[index-1] || false;
 				currentPage = page;
 				nextPage = this.pages[index+1] || false;
@@ -166,6 +167,12 @@ export default class Walkthrough {
 			currentStep.done = true;
 			this.saveLS();
 
+			// if it's last step of page
+			if(currentPage.steps.indexOf(currentStep) == currentPage.steps.length - 1 ){
+				// done
+				return this.finishPage();
+			}
+
 			// new current step
 
 			currentStep = this.getStep();
@@ -174,18 +181,14 @@ export default class Walkthrough {
 			this.onStepElementEnter();
 
 			console.log('The current step is', currentStep);
-			// if it's last step of page
-			if(currentPage.steps.indexOf(currentStep) == currentPage.steps.length - 1 ){
-				// done
-				this.finishPage();
-			}
 		}
 	}
 
 	finishPage (){
 		let finishedPage = this.getPage();
 		if(finishedPage == this.pages[this.pages.length - 1]){
-			// it's the last page and it's finished
+			// it's walkthrough's last page and it's finished
+			console.log('last page finished');
 			this.removeLS();
 			this.walkthroughManager.onFinish(this.title);
 		}

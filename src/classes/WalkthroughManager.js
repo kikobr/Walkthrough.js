@@ -7,18 +7,25 @@ export default class WalkthroughManager {
 		this.walkthroughs = args.walkthroughs || [];
 		this.localStorageKey = args.localStorageKey || "walkthrough-current";
 		this.className = args.className || "walkthrough-current";
-		this.onStepElementEnter = args.onStepElementEnter || function (el, step) { el.classList.add(this.className); };
-		this.onStepElementLeave = args.onStepElementLeave || function (el, step) { el.classList.remove(this.className); };
+		this.renderTo = args.renderTo || "body";
+		// this.onStepElementEnter = args.onStepElementEnter || function (el, step) { el.classList.add(this.className); };
+		// this.onStepElementLeave = args.onStepElementLeave || function (el, step) { el.classList.remove(this.className); };
 		this.onFinish = args.onFinish || function (walkthroughName) {};
 		this.currentWalkthrough = new Walkthrough();
+		this.onStepElementEnter = (el, step) => {
+			el.classList.add(this.className);
+			typeof args.onStepElementEnter == 'function' ? args.onStepElementEnter.call(this, el, step) : '';
+		}
+		this.onStepElementLeave = (el, step) => {
+			el.classList.remove(this.className);
+			typeof args.onStepElementLeave == 'function' ? args.onStepElementLeave.call(this, el, step) : '';
+		}
 
 		this.load(this.walkthroughs);
 		this.render();
 		this.eventManager = new EventManager();
 
 		this.recoverLS();
-
-		console.log(this.walkthroughs);
 	}
 
 	recoverLS () {
@@ -32,7 +39,8 @@ export default class WalkthroughManager {
 		walkthroughs.forEach(walkthrough => {
 			// add to availableWalkthroughs if matches it's pages url
 			for (let page of walkthrough.pages) {
-				if(page.url == window.location.pathname){
+				// comparing the two urls is safer without final / 
+				if(page.url.replace(/\/$/, '')  == window.location.pathname.replace(/\/$/, '') ){
 					walkthrough.available = true;
 					break;
 				}
@@ -52,12 +60,18 @@ export default class WalkthroughManager {
 		let template = `<ul data-walkthroughs>${walkthroughs}</ul>`;
 		let div = document.createElement('div');
 		div.innerHTML = template;
-		document.body.appendChild(div);
+		document.querySelector(this.renderTo).appendChild(div);
 		// Set listeners to start walkthroughs on click
-		document.querySelector('[data-walkthroughs] [data-index]').addEventListener('click', evt => {
-			let walkthrough = this.walkthroughs[evt.target.getAttribute('data-index')];
-			this.start(walkthrough);
-		});
+		let walkthroughPlayElements = document.querySelectorAll('[data-walkthroughs] [data-index]');
+		if( walkthroughPlayElements.length ){
+			for(let i = 0; i < walkthroughPlayElements.length; i ++){
+				let walkthroughPlayElement = walkthroughPlayElements[i];
+				walkthroughPlayElement.addEventListener('click', evt => {
+					let walkthrough = this.walkthroughs[evt.target.getAttribute('data-index')];
+					this.start(walkthrough);
+				});
+			}
+		}
 	}
 
 	start (walkthrough) {
