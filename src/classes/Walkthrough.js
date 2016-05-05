@@ -26,49 +26,44 @@ export default class Walkthrough {
 				let	currentStepElement = document.querySelector(currentStep.target);
 				this.walkthroughManager.onStepElementLeave(currentStepElement, currentStep);
 			}
-			console.log('Walkthrough reloaded');
+			console.log('[Walkthrough.js:Walkthrough] Walkthrough reloaded');
 		}
 
 		this.walkthroughManager = walkthroughManager;
 		this.title = walkthrough.title;
-		this.pages = walkthrough.pages;
+		this.steps = walkthrough.steps;
 		this.options = walkthrough.options;
 
 		/*
-		* 	If there are pages before the current one in the walkthrough object, it means the user 
+		* 	If there are steps before the current one in the walkthrough object, it means the user 
 		*	already did the previous steps OR the user simply jumped in the middle of the walkthrough.
 		*	In either cases, we must assume previous steps as done, every single one of them.
 		**/
-		let prevPage = this.getPage('prev');
-		if(prevPage){
-			let currentPage = this.getPage();
-			for(let page of this.pages){
-				if(page.url == currentPage.url) {
-					break;
-					// return false;
-				}
-				page.steps.forEach(step => { step.done = true; }); // reset
+		let prevStep = this.getStep('prev'),
+			currentStep = this.getStep();
+		if(prevStep){
+			for(let step of this.steps){
+				if(step == currentStep) { break; }
+				step.done = true;
 			}
 		}
 
 		// add to localStorage
 		this.saveLS();
 
-		let currentStep = this.getStep();
 		if(currentStep) {
-			console.log('The current step is', currentStep);
+			console.log('[Walkthrough.js:Walkthrough] The current step is', currentStep);
 			let currentStepElement = document.querySelector(currentStep.target);
 			this.onStepElementEnter();
 			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 		}
-		// console.log(this.getStep());
 	}
 
 	saveLS () {
 		if(!window.localStorage) return;
 		window.localStorage.setItem(this.walkthroughManager.localStorageKey, JSON.stringify({
 			title: this.title,
-			pages: this.pages,
+			steps: this.steps,
 			options: this.options,
 		}));
 	}
@@ -80,37 +75,28 @@ export default class Walkthrough {
 
 	// methods
 
-	getPage (position = 'current') {
-		let currentPage = null,
-			prevPage = null,
-			nextPage = null,
-			page = null;
-		for (let [index, page] of this.pages.entries()) {
-			// comparing the two urls is safer without final / 
-			if(page.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '')){
-				prevPage = this.pages[index-1] || false;
-				currentPage = page;
-				nextPage = this.pages[index+1] || false;
-				break;
-			}
-		}
-		if(position == 'prev') page = prevPage;
-		else if(position == 'current') page = currentPage;
-		else if(position == 'next') page = nextPage;
-		return page;
-	}
-
 	getStep (position = 'current') {
 		let currentStep = null,
 			prevStep = null,
 			nextStep = null,
 			step = null;
-		let steps = this.getPage().steps;
-		for (let [index, step] of steps.entries()){
-			if(step.done != true){
-				prevStep = steps[index-1] || false;
+
+		for (let [index, step] of this.steps.entries()){
+			let isCurrentUrl;
+			// if step.url contains a '*' , it means it'll be available to any routes
+			// after it. So, in these cases, use a match at the beginning of the url
+			if(step.url.match(/\*/g)){
+				let regex = new RegExp("^" + step.url.replace('*', '').replace(/\/$/, ''));
+				isCurrentUrl = window.location.pathname.replace(/\/$/, '').match(regex);
+			} else {
+				// comparing the two urls is safer without final '/' 
+				isCurrentUrl = step.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '');
+			}
+
+			if(isCurrentUrl && !step.done) {
+				prevStep = this.steps[index-1] || false;
 				currentStep = step;
-				nextStep = steps[index+1] || false;
+				nextStep = this.steps[index+1] || false;
 				break;
 			}
 		}
@@ -135,9 +121,8 @@ export default class Walkthrough {
 	}
 
 	triggerEvent (evt) {
-		let currentPage = this.getPage(),
-			currentStep = this.getStep();
-		if(!currentPage || !currentStep) return false;
+		let currentStep = this.getStep();
+		if(!currentStep) return false;
 
 		let currentStepElement = document.querySelector(currentStep.target);
 
@@ -158,40 +143,37 @@ export default class Walkthrough {
 				evt.target == currentStepElement ||
 				currentStepElement.contains(evt.target)
 			)
-			// && (
-			// )
 		){			
-			console.log('done:', currentStep);
+			console.log('[Walkthrough.js:Walkthrough] Done:', currentStep);
 			this.onStepElementLeave();
 			currentStepElement.removeAttribute('data-walkthrough-step-target');
 			currentStep.done = true;
 			this.saveLS();
 
-			// if it's last step of page
-			if(currentPage.steps.indexOf(currentStep) == currentPage.steps.length - 1 ){
+			// if it's last step of the walkthrough
+			if(this.steps.indexOf(currentStep) == this.steps.length - 1 ){
 				// done
-				return this.finishPage();
+				return this.finish();
 			}
 
 			// new current step
 
 			currentStep = this.getStep();
+			if(!currentStep) return;
 			currentStepElement = document.querySelector(currentStep.target);
 			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 			this.onStepElementEnter();
 
-			console.log('The current step is', currentStep);
+			console.log('[Walkthrough.js:Walkthrough] The current step is', currentStep);
 		}
 	}
 
-	finishPage (){
-		let finishedPage = this.getPage();
-		if(finishedPage == this.pages[this.pages.length - 1]){
-			// it's walkthrough's last page and it's finished
-			console.log('last page finished');
-			this.removeLS();
-			this.walkthroughManager.onFinish(this.title);
-		}
-		console.log('finished:', finishedPage);
+	finish (){
+		// it's walkthrough's last step and it's finished
+		console.log('[Walkthrough.js:Walkthrough] Last step finished');
+		this.removeLS();
+		this.walkthroughManager.onFinish(this.title);
+
+		console.log('[Walkthrough.js:Walkthrough] Finished walkthrough');
 	}
 }

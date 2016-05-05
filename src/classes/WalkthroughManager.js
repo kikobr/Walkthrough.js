@@ -37,10 +37,19 @@ export default class WalkthroughManager {
 	load (walkthroughs = []) {
 		this.walkthroughs = [];
 		walkthroughs.forEach(walkthrough => {
-			// add to availableWalkthroughs if matches it's pages url
-			for (let page of walkthrough.pages) {
-				// comparing the two urls is safer without final / 
-				if(page.url.replace(/\/$/, '')  == window.location.pathname.replace(/\/$/, '') ){
+			// add to availableWalkthroughs if matches it's steps url
+			for (let step of walkthrough.steps) {
+				let isCurrentUrl;
+				// if step.url contains a '*' , it means it'll be available to any routes
+				// after it. So, in these cases, use a match at the beginning of the url
+				if(step.url.match(/\*/g)){
+					let regex = new RegExp("^" + step.url.replace('*', '').replace(/\/$/, ''));
+					isCurrentUrl = window.location.pathname.replace(/\/$/, '').match(regex);
+				} else {
+					// comparing the two urls is safer without final '/' 
+					isCurrentUrl = step.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '');
+				}
+				if(isCurrentUrl){
 					walkthrough.available = true;
 					break;
 				}
@@ -75,7 +84,7 @@ export default class WalkthroughManager {
 	}
 
 	start (walkthrough) {
-		console.log(`Starting ${walkthrough.title}!`);
+		console.log(`[Walkthrough.js:Manager] Starting ${walkthrough.title}!`);
 		walkthrough.active = true;
 		let clonedWalkthrough = JSON.parse(JSON.stringify(walkthrough));
 		this.currentWalkthrough.load(this, clonedWalkthrough);
