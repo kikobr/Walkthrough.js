@@ -8,6 +8,7 @@ var source = require('vinyl-source-stream'); // Vinyl stream support
 var buffer = require('vinyl-buffer'); // Vinyl stream support
 var watchify = require('watchify'); // Watchify for source changes
 var merge = require('utils-merge'); // Object merge tool
+var uglify = require('gulp-uglify');
 
 // Completes the final file outputs
 function bundle(bundler) {
@@ -17,7 +18,7 @@ function bundle(bundler) {
         .on('error', function(err){ console.error(err); }) // Map error reporting
         .pipe(source('index.js')) // Set source name
         .pipe(buffer()) // Convert to gulp pipeline
-        .pipe(rename('walkthrough.min.js')) // Rename the output file
+        .pipe(rename('walkthrough.js')) // Rename the output file
         .pipe(gulp.dest('dist/')) // Set the output folder
 }
 function bundleCreator(bundler) {
@@ -27,7 +28,7 @@ function bundleCreator(bundler) {
         .on('error', function(err){ console.error(err); }) // Map error reporting
         .pipe(source('creator.js')) // Set source name
         .pipe(buffer()) // Convert to gulp pipeline
-        .pipe(rename('walkthrough-creator.min.js')) // Rename the output file
+        .pipe(rename('walkthrough-creator.js')) // Rename the output file
         .pipe(gulp.dest('dist/')) // Set the output folder
 }
 
@@ -61,5 +62,15 @@ gulp.task('scripts', function() {
 });
 
 gulp.task('watch', ['scripts'], function(){});
+
+gulp.task('compress', function() {
+    return gulp.src('./dist/*.js')
+        .pipe(uglify())
+        .pipe(rename({ extname: '.min.js' })) // Rename the output file
+        .pipe(gulp.dest('./dist'));
+});
+
+gulp.task('build', ['compress'], function(){
+});
 
 gulp.task('default', ['watch']);
