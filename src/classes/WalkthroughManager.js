@@ -1,5 +1,6 @@
 import Walkthrough from './Walkthrough';
 import EventManager from './EventManager';
+import Logger from './Logger';
 
 export default class WalkthroughManager {
 	
@@ -8,10 +9,12 @@ export default class WalkthroughManager {
 		this.localStorageKey = args.localStorageKey || "walkthrough-current";
 		this.className = args.className || "walkthrough-current";
 		this.renderTo = args.renderTo || "body";
+		this.log = args.log || false;
+		this.logger = new Logger({ enabled: this.log, prefix: 'Manager' });
 		// this.onStepElementEnter = args.onStepElementEnter || function (el, step) { el.classList.add(this.className); };
 		// this.onStepElementLeave = args.onStepElementLeave || function (el, step) { el.classList.remove(this.className); };
 		this.onFinish = args.onFinish || function (walkthroughName) {};
-		this.currentWalkthrough = new Walkthrough();
+		this.currentWalkthrough = new Walkthrough({ log: this.log });
 		this.onStepElementEnter = (el, step) => {
 			el.classList.add(this.className);
 			typeof args.onStepElementEnter == 'function' ? args.onStepElementEnter.call(this, el, step) : '';
@@ -23,7 +26,7 @@ export default class WalkthroughManager {
 
 		this.load(this.walkthroughs);
 		this.render();
-		this.eventManager = new EventManager();
+		this.eventManager = new EventManager({ log: this.log });
 
 		this.recoverLS();
 	}
@@ -31,7 +34,16 @@ export default class WalkthroughManager {
 	recoverLS () {
 		if(!window.localStorage) return;
 		let recoveredWalkthrough = JSON.parse(window.localStorage.getItem(this.localStorageKey));
-		recoveredWalkthrough ? this.start(recoveredWalkthrough) : '';
+		// check if recovered walkthrough exists inside actual walkthroughs list
+		let exists = false;
+		for(let walkthrough of this.walkthroughs){
+			if(walkthrough.title == recoveredWalkthrough.title){
+				exists = true;
+				break;
+			}
+		}
+		// if recovered walkthrough dont exist anymore, wipe it from local storage 
+		recoveredWalkthrough && exists ? this.start(recoveredWalkthrough) : window.localStorage.removeItem(this.localStorageKey);
 	}
 	
 	load (walkthroughs = []) {
@@ -84,7 +96,7 @@ export default class WalkthroughManager {
 	}
 
 	start (walkthrough) {
-		console.log(`[Walkthrough.js:Manager] Starting ${walkthrough.title}!`);
+		this.logger.log(`Starting ${walkthrough.title}!`);
 		walkthrough.active = true;
 		let clonedWalkthrough = JSON.parse(JSON.stringify(walkthrough));
 		this.currentWalkthrough.load(this, clonedWalkthrough);

@@ -5,9 +5,11 @@
 *	TODO: Inside onStepElementEnter, if the element was removed by
 *	frontend, try to wait until element is available to trigger it on.
 **/
+import Logger from './Logger';
 
 export default class Walkthrough {
-	constructor() {
+	constructor(args) {
+		this.logger = new Logger({ enabled: args.log, prefix: 'Walkthrough' });
 	}
 
 	load (walkthroughManager, walkthrough) {
@@ -26,13 +28,26 @@ export default class Walkthrough {
 				let	currentStepElement = document.querySelector(currentStep.target);
 				this.walkthroughManager.onStepElementLeave(currentStepElement, currentStep);
 			}
-			console.log('[Walkthrough.js:Walkthrough] Walkthrough reloaded');
+			this.logger.log('Walkthrough reloaded');
 		}
 
 		this.walkthroughManager = walkthroughManager;
 		this.title = walkthrough.title;
 		this.steps = walkthrough.steps;
+		this.autoreset = walkthrough.autoreset || false;
 		this.options = walkthrough.options;
+
+		/*
+		*	If walkthrough is autoreset = true, clear all steps. When we get the current step on the next
+		*	block (current step is the first !done step that matches current page), the previous steps will
+		*	be set to true. This way, we can always restart the walkthrough from the beginning but also jump
+		*	to the middle of it if the user navigated to advanced steps.
+		**/
+		if(this.autoreset){
+			for(let step of this.steps){
+				step.done = false;
+			}
+		}
 
 		/*
 		* 	If there are steps before the current one in the walkthrough object, it means the user 
@@ -52,10 +67,9 @@ export default class Walkthrough {
 		this.saveLS();
 
 		if(currentStep) {
-			console.log('[Walkthrough.js:Walkthrough] The current step is', currentStep);
+			this.logger.log('The current step is', currentStep);
 			let currentStepElement = document.querySelector(currentStep.target);
 			this.onStepElementEnter();
-			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 		}
 	}
 
@@ -64,6 +78,7 @@ export default class Walkthrough {
 		window.localStorage.setItem(this.walkthroughManager.localStorageKey, JSON.stringify({
 			title: this.title,
 			steps: this.steps,
+			autoreset: this.autoreset,
 			options: this.options,
 		}));
 	}
@@ -81,25 +96,46 @@ export default class Walkthrough {
 			nextStep = null,
 			step = null;
 
-		for (let [index, step] of this.steps.entries()){
-			let isCurrentUrl;
-			// if step.url contains a '*' , it means it'll be available to any routes
-			// after it. So, in these cases, use a match at the beginning of the url
-			if(step.url.match(/\*/g)){
-				let regex = new RegExp("^" + step.url.replace('*', '').replace(/\/$/, ''));
-				isCurrentUrl = window.location.pathname.replace(/\/$/, '').match(regex);
-			} else {
-				// comparing the two urls is safer without final '/' 
-				isCurrentUrl = step.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '');
-			}
+		let hasDynamicMatch = false;
 
-			if(isCurrentUrl && !step.done) {
+		for (let [index, step] of this.steps.entries()){
+
+			// only return as currentStep those that are not done
+			if(step.done) continue;
+
+			let exactMatch = false,
+				dynamicMatch = false;
+
+			// comparing the two urls is safer without final '/' 
+			if (step.url.replace(/\/$/, '') == window.location.pathname.replace(/\/$/, '')) {
+				exactMatch = true;
+			} 
+			/*	
+			*	If step.url didn't match exactly the page url, and it contains a '*', 
+			*	it'll match any url that starts with what's before step.url's '*'.
+			*
+			*	hasDynamicMatch will allow only the first dynamic match to be returned as currentStep.
+			**/
+			else if(!hasDynamicMatch && step.url.match(/\*/g)){
+				let regex = new RegExp("^" + step.url.replace('*', '').replace(/\/$/, ''));
+				if(window.location.pathname.replace(/\/$/, '').match(regex)){
+					dynamicMatch = true;
+					hasDynamicMatch = true;	
+				}
+			} 
+
+			/*
+			*	dynamicMatchs dont break the loop. This will give a chance for all steps to be
+			*	exactly matched, and the first one that does will break the loop.
+			*/
+			if(exactMatch || dynamicMatch) {
 				prevStep = this.steps[index-1] || false;
 				currentStep = step;
 				nextStep = this.steps[index+1] || false;
-				break;
+				if(exactMatch) break;
 			}
 		}
+		this.logger.log('Current step:', currentStep);
 		if(position == 'prev') step = prevStep;
 		else if(position == 'current') step = currentStep;
 		else if(position == 'next') step = nextStep;
@@ -110,13 +146,36 @@ export default class Walkthrough {
 		let currentStep = step || this.getStep();
 		if(!currentStep) return;
 		let	currentStepElement = document.querySelector(currentStep.target);
-		this.walkthroughManager.onStepElementEnter(currentStepElement, currentStep);
+		
+		/*
+			If the step element is not available, im assuming it's dynamic and is yet to be
+			rendered to the DOM. So, we'll wait for a timeout to wait it appear.
+		*/
+		if(!currentStepElement){
+			let time = 0,
+				timeout = 5000;
+			let elementShowedUp = () => {
+				currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
+				this.walkthroughManager.onStepElementEnter(currentStepElement, currentStep);
+				clearInterval(waitUntilElementShowsUp);
+			}
+			let waitUntilElementShowsUp = setInterval(()=>{
+				currentStepElement = document.querySelector(currentStep.target);
+				time += 100;
+				if(currentStepElement) elementShowedUp();
+				else if(time >= timeout) clearInterval(waitUntilElementShowsUp);
+			}, 100);
+		} else {
+			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
+			this.walkthroughManager.onStepElementEnter(currentStepElement, currentStep);
+		}
 	}
 
 	onStepElementLeave (step = null) {
 		let currentStep = step || this.getStep();
 		if(!currentStep) return;
 		let currentStepElement = document.querySelector(currentStep.target);
+		currentStepElement.removeAttribute('data-walkthrough-step-target');
 		this.walkthroughManager.onStepElementLeave(currentStepElement, currentStep);
 	}
 
@@ -144,9 +203,8 @@ export default class Walkthrough {
 				currentStepElement.contains(evt.target)
 			)
 		){			
-			console.log('[Walkthrough.js:Walkthrough] Done:', currentStep);
+			this.logger.log('Done:', currentStep);
 			this.onStepElementLeave();
-			currentStepElement.removeAttribute('data-walkthrough-step-target');
 			currentStep.done = true;
 			this.saveLS();
 
@@ -160,20 +218,18 @@ export default class Walkthrough {
 
 			currentStep = this.getStep();
 			if(!currentStep) return;
-			currentStepElement = document.querySelector(currentStep.target);
-			currentStepElement.setAttribute('data-walkthrough-step-target', currentStep.target);
 			this.onStepElementEnter();
 
-			console.log('[Walkthrough.js:Walkthrough] The current step is', currentStep);
+			this.logger.log('The current step is', currentStep);
 		}
 	}
 
 	finish (){
 		// it's walkthrough's last step and it's finished
-		console.log('[Walkthrough.js:Walkthrough] Last step finished');
+		this.logger.log('Last step finished');
 		this.removeLS();
 		this.walkthroughManager.onFinish(this.title);
 
-		console.log('[Walkthrough.js:Walkthrough] Finished walkthrough');
+		this.logger.log('Finished walkthrough');
 	}
 }

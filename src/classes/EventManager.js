@@ -1,6 +1,10 @@
+import Logger from './Logger';
+
 export default class EventManager {
-	constructor (walkthrough = false) {
-		this.walkthrough = walkthrough;
+	constructor (args) {
+
+		this.logger = new Logger({ enabled: args.log, prefix: 'EventManager' });
+
 		this.availableEvents = [
 			'click',
 			'submit',
