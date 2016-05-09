@@ -146,6 +146,8 @@ var Walkthrough = function () {
 	_createClass(Walkthrough, [{
 		key: 'load',
 		value: function load(walkthroughManager, walkthrough) {
+			var opts = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+
 
 			/*
    *	If this.walkthroughManager is present, it means this class is already instantiated 
@@ -165,10 +167,12 @@ var Walkthrough = function () {
 			}
 
 			this.walkthroughManager = walkthroughManager;
-			this.title = walkthrough.title;
+			this.name = walkthrough.name;
+			this.label = walkthrough.label;
 			this.steps = walkthrough.steps;
 			this.autoreset = walkthrough.autoreset || false;
 			this.options = walkthrough.options;
+			this.stepEnter = opts.stepEnter == false ? false : true;
 
 			/*
    *	If walkthrough is autoreset = true, clear all steps. When we get the current step on the next
@@ -243,6 +247,8 @@ var Walkthrough = function () {
 			// add to localStorage
 			this.saveLS();
 
+			if (!this.stepEnter) return;
+
 			if (currentStep) {
 				this.logger.log('The current step is', currentStep);
 				var _currentStepElement = document.querySelector(currentStep.target);
@@ -254,7 +260,8 @@ var Walkthrough = function () {
 		value: function saveLS() {
 			if (!window.localStorage) return;
 			window.localStorage.setItem(this.walkthroughManager.localStorageKey, JSON.stringify({
-				title: this.title,
+				name: this.name,
+				label: this.label,
 				steps: this.steps,
 				autoreset: this.autoreset,
 				options: this.options
@@ -309,9 +316,9 @@ var Walkthrough = function () {
      *
      *	hasDynamicMatch will allow only the first dynamic match to be returned as currentStep.
      **/
-					else if (!hasDynamicMatch && _step5.url.match(/\*/g)) {
+					else if (_step5.url.match(/\*/g)) {
 							var regex = new RegExp("^" + _step5.url.replace('*', '').replace(/\/$/, ''));
-							if (window.location.pathname.replace(/\/$/, '').match(regex)) {
+							if (window.location.pathname.replace(/\/$/, '').match(regex) && (hasDynamicMatch ? _step5.url.length > currentStep.url.length : true)) {
 								dynamicMatch = true;
 								hasDynamicMatch = true;
 							}
@@ -438,7 +445,7 @@ var Walkthrough = function () {
 			// it's walkthrough's last step and it's finished
 			this.logger.log('Last step finished');
 			this.removeLS();
-			this.walkthroughManager.onFinish(this.title);
+			this.walkthroughManager.onFinish(this.name);
 
 			this.logger.log('Finished walkthrough');
 		}
@@ -513,6 +520,7 @@ var WalkthroughManager = function () {
 		value: function recoverLS() {
 			if (!window.localStorage) return;
 			var recoveredWalkthrough = JSON.parse(window.localStorage.getItem(this.localStorageKey));
+			if (!recoveredWalkthrough) return;
 			// check if recovered walkthrough exists inside actual walkthroughs list
 			var exists = false;
 			var _iteratorNormalCompletion = true;
@@ -523,7 +531,7 @@ var WalkthroughManager = function () {
 				for (var _iterator = this.walkthroughs[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
 					var walkthrough = _step.value;
 
-					if (walkthrough.title == recoveredWalkthrough.title) {
+					if (walkthrough.name == recoveredWalkthrough.name) {
 						exists = true;
 						break;
 					}
@@ -605,10 +613,12 @@ var WalkthroughManager = function () {
 		value: function render() {
 			var _this3 = this;
 
+			if (!this.renderTo) return;
+
 			var walkthroughs = '';
 			this.walkthroughs.forEach(function (walkthrough, index) {
 				var playButton = walkthrough.available ? ' <button data-index="' + index + '">Play</button>' : '';
-				walkthroughs += '<li>' + walkthrough.title + playButton + '</li>';
+				walkthroughs += '<li>' + walkthrough.label + playButton + '</li>';
 			});
 			var template = '<ul data-walkthroughs>' + walkthroughs + '</ul>';
 			var div = document.createElement('div');
@@ -629,10 +639,42 @@ var WalkthroughManager = function () {
 	}, {
 		key: 'start',
 		value: function start(walkthrough) {
-			this.logger.log('Starting ' + walkthrough.title + '!');
+			var opts = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+
+			// also start walkthroughs by name
+			if (typeof walkthrough == 'string') {
+				var _iteratorNormalCompletion3 = true;
+				var _didIteratorError3 = false;
+				var _iteratorError3 = undefined;
+
+				try {
+					for (var _iterator3 = this.walkthroughs[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+						var walk = _step3.value;
+
+						if (walk.name == walkthrough) {
+							walkthrough = walk;
+							break;
+						}
+					}
+				} catch (err) {
+					_didIteratorError3 = true;
+					_iteratorError3 = err;
+				} finally {
+					try {
+						if (!_iteratorNormalCompletion3 && _iterator3.return) {
+							_iterator3.return();
+						}
+					} finally {
+						if (_didIteratorError3) {
+							throw _iteratorError3;
+						}
+					}
+				}
+			}
+			this.logger.log('Starting ' + walkthrough.name + '!');
 			walkthrough.active = true;
 			var clonedWalkthrough = JSON.parse(JSON.stringify(walkthrough));
-			this.currentWalkthrough.load(this, clonedWalkthrough);
+			this.currentWalkthrough.load(this, clonedWalkthrough, { stepEnter: opts.stepEnter == false ? false : true });
 			this.eventManager.walkthrough = this.currentWalkthrough;
 		}
 	}]);

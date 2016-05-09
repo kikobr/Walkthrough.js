@@ -12,7 +12,7 @@ export default class Walkthrough {
 		this.logger = new Logger({ enabled: args.log, prefix: 'Walkthrough' });
 	}
 
-	load (walkthroughManager, walkthrough) {
+	load (walkthroughManager, walkthrough, opts = {}) {
 
 		/*
 		*	If this.walkthroughManager is present, it means this class is already instantiated 
@@ -32,10 +32,12 @@ export default class Walkthrough {
 		}
 
 		this.walkthroughManager = walkthroughManager;
-		this.title = walkthrough.title;
+		this.name = walkthrough.name;
+		this.label = walkthrough.label;
 		this.steps = walkthrough.steps;
 		this.autoreset = walkthrough.autoreset || false;
 		this.options = walkthrough.options;
+		this.stepEnter = opts.stepEnter == false ? false : true;
 
 		/*
 		*	If walkthrough is autoreset = true, clear all steps. When we get the current step on the next
@@ -66,6 +68,8 @@ export default class Walkthrough {
 		// add to localStorage
 		this.saveLS();
 
+		if(!this.stepEnter) return;
+
 		if(currentStep) {
 			this.logger.log('The current step is', currentStep);
 			let currentStepElement = document.querySelector(currentStep.target);
@@ -76,7 +80,8 @@ export default class Walkthrough {
 	saveLS () {
 		if(!window.localStorage) return;
 		window.localStorage.setItem(this.walkthroughManager.localStorageKey, JSON.stringify({
-			title: this.title,
+			name: this.name,
+			label: this.label,
 			steps: this.steps,
 			autoreset: this.autoreset,
 			options: this.options,
@@ -116,13 +121,16 @@ export default class Walkthrough {
 			*
 			*	hasDynamicMatch will allow only the first dynamic match to be returned as currentStep.
 			**/
-			else if(!hasDynamicMatch && step.url.match(/\*/g)){
+			else if(step.url.match(/\*/g)){
 				let regex = new RegExp("^" + step.url.replace('*', '').replace(/\/$/, ''));
-				if(window.location.pathname.replace(/\/$/, '').match(regex)){
+				if(
+					window.location.pathname.replace(/\/$/, '').match(regex) && 
+					(hasDynamicMatch ? step.url.length > currentStep.url.length : true)
+				){
 					dynamicMatch = true;
-					hasDynamicMatch = true;	
+					hasDynamicMatch = true;
 				}
-			} 
+			}
 
 			/*
 			*	dynamicMatchs dont break the loop. This will give a chance for all steps to be
@@ -228,7 +236,7 @@ export default class Walkthrough {
 		// it's walkthrough's last step and it's finished
 		this.logger.log('Last step finished');
 		this.removeLS();
-		this.walkthroughManager.onFinish(this.title);
+		this.walkthroughManager.onFinish(this.name);
 
 		this.logger.log('Finished walkthrough');
 	}

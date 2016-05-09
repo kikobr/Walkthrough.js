@@ -34,10 +34,11 @@ export default class WalkthroughManager {
 	recoverLS () {
 		if(!window.localStorage) return;
 		let recoveredWalkthrough = JSON.parse(window.localStorage.getItem(this.localStorageKey));
+		if(!recoveredWalkthrough) return;
 		// check if recovered walkthrough exists inside actual walkthroughs list
 		let exists = false;
 		for(let walkthrough of this.walkthroughs){
-			if(walkthrough.title == recoveredWalkthrough.title){
+			if(walkthrough.name == recoveredWalkthrough.name){
 				exists = true;
 				break;
 			}
@@ -73,10 +74,12 @@ export default class WalkthroughManager {
 	// methods
 
 	render () {
+		if(!this.renderTo) return;
+		
 		let walkthroughs = '';
 		this.walkthroughs.forEach((walkthrough, index) =>{
 			let playButton = walkthrough.available ? ` <button data-index="${index}">Play</button>` : '';
-			walkthroughs += `<li>${walkthrough.title}${playButton}</li>`;
+			walkthroughs += `<li>${walkthrough.label}${playButton}</li>`;
 		});
 		let template = `<ul data-walkthroughs>${walkthroughs}</ul>`;
 		let div = document.createElement('div');
@@ -95,11 +98,20 @@ export default class WalkthroughManager {
 		}
 	}
 
-	start (walkthrough) {
-		this.logger.log(`Starting ${walkthrough.title}!`);
+	start (walkthrough, opts = {}) {
+		// also start walkthroughs by name
+		if(typeof walkthrough == 'string'){
+			for(let walk of this.walkthroughs){
+				if(walk.name == walkthrough){
+					walkthrough = walk;
+					break;
+				}
+			}
+		}
+		this.logger.log(`Starting ${walkthrough.name}!`);
 		walkthrough.active = true;
 		let clonedWalkthrough = JSON.parse(JSON.stringify(walkthrough));
-		this.currentWalkthrough.load(this, clonedWalkthrough);
+		this.currentWalkthrough.load(this, clonedWalkthrough, { stepEnter: opts.stepEnter == false ? false : true });
 		this.eventManager.walkthrough = this.currentWalkthrough;
 	}
 
