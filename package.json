@@ -1,7 +1,7 @@
 {
   "name": "walkthrough.js",
   "version": "0.1.0",
-  "description": "A frontend step by step walkthrough plugin.",
+  "description": "A javascript only plugin to create guided tours and walkthroughs inside your web application.",
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
